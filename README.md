@@ -126,6 +126,9 @@ Ensure all containers are healthy:
 ```bash
 docker ps
 ```
+**4. API Documentation**
+View the interactive Swagger/OpenAPI documentation here:
+[http://localhost:8083](http://localhost:8083)
 
 ## 🧪 Testing the API
 

@@ -58,7 +58,18 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
     networks:
       - ledger-net
-
+  
+  swagger-ui:
+    image: swaggerapi/swagger-ui
+    container_name: ledger_swagger
+    ports:
+      - "8083:8080" # We map host port 8083 to container port 8080
+    environment:
+      SWAGGER_JSON: /openapi.yaml
+    volumes:
+      - ./api-spec.yaml:/openapi.yaml # Mount your local file into the container
+    networks:
+      - ledger-net
   # --- APPLICATIONS ---
   
   payment-gateway:
