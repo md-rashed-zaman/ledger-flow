@@ -1,0 +1,8 @@
+server:
+  port: ":8081"
+
+kafka:
+  brokers: ["localhost:9092"]
+  topic: "transfer-requests"
+  producer:
+    retry_max: 5

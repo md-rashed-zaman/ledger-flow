@@ -1,0 +1,77 @@
+openapi: 3.0.3
+info:
+  title: LedgerFlow API
+  description: >
+    High-performance Event-Driven Ledger System. 
+    Handles money transfers with eventual consistency and double-entry bookkeeping.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081/api/v1
+    description: Local Docker Environment
+
+paths:
+  /transfer:
+    post:
+      summary: Initiate a Money Transfer
+      description: >
+        Accepts a transfer request. It performs basic validation and pushes the event to Kafka.
+        The actual processing happens asynchronously in the Ledger Core.
+      operationId: createTransfer
+      requestBody:
+        description: Transfer details
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+      responses:
+        '202':
+          description: Accepted. Request is being processed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Transfer initiated successfully"
+                  status:
+                    type: string
+                    example: "pending"
+        '400':
+          description: Invalid Input (e.g., negative amount).
+        '500':
+          description: Internal Server Error (Kafka unavailable).
+
+components:
+  schemas:
+    TransferRequest:
+      type: object
+      required:
+        - idempotency_key
+        - source_account
+        - target_account
+        - amount
+        - currency
+      properties:
+        idempotency_key:
+          type: string
+          description: Unique ID to prevent double-spending (UUID recommended).
+          example: "tx-unique-12345"
+        source_account:
+          type: string
+          description: The ID of the sender.
+          example: "ACC_ALICE"
+        target_account:
+          type: string
+          description: The ID of the receiver.
+          example: "ACC_BOB"
+        amount:
+          type: number
+          format: double
+          description: Amount to transfer (Must be > 0).
+          example: 100.50
+        currency:
+          type: string
+          description: 3-letter ISO currency code.
+          example: "USD"

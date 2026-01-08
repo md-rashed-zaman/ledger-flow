@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # --- INFRASTRUCTURE ---
+  postgres:
+    image: postgres:15-alpine
+    container_name: ledger_postgres
+    environment:
+      POSTGRES_USER: ledger_user
+      POSTGRES_PASSWORD: ledger_password
+      POSTGRES_DB: ledger_db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ledger_user -d ledger_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - ledger-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: ledger_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ledger-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: ledger_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # Listen on port 29092 for internal Docker traffic, 9092 for host traffic
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - ledger-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: ledger_kafka_ui
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - ledger-net
+
+  # --- APPLICATIONS ---
+  
+  payment-gateway:
+    build: ./payment-gateway
+    container_name: payment_gateway
+    depends_on:
+      - kafka
+    ports:
+      - "8081:8081"
+    environment:
+      # Override Config with Environment Variables
+      SERVER_PORT: ":8081"
+      KAFKA_BROKERS: "kafka:29092" # Talk to internal Docker port
+      KAFKA_TOPIC: "transfer-requests"
+    networks:
+      - ledger-net
+
+  ledger-core:
+    build: ./ledger-core
+    container_name: ledger_core
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    ports:
+      - "8082:8082"
+    environment:
+      # Spring Boot Auto-Configuration Overrides
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/ledger_db
+      SPRING_DATASOURCE_USERNAME: ledger_user
+      SPRING_DATASOURCE_PASSWORD: ledger_password
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - ledger-net
+
+networks:
+  ledger-net:
+    driver: bridge

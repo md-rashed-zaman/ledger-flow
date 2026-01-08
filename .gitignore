@@ -1,0 +1,16 @@
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Go junk
+payment-gateway/main
+payment-gateway/payment-gateway
+
+# Java junk
+target/
+*.class
+*.jar
+
+# Docker junk
+infra/data/
