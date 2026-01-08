@@ -22,20 +22,12 @@ It solves critical FinTech challenges:
 The system follows the **CQRS** (Command Query Responsibility Segregation) pattern principles.
 
 ```mermaid
-graph LR
-    User((User))
-    subgraph Ingestion["Ingestion Layer"]
-        PG[Payment Gateway<br/>Golang]
-    end
-    
-    subgraph Event["Event Backbone"]
-        Kafka{Apache Kafka}
-    end
-    
-    subgraph Core["Core Domain"]
-        LC[Ledger Core<br/>Spring Boot]
-        DB[(PostgreSQL)]
-    end
+flowchart TD
+    User[User]
+    PG[Payment Gateway<br/>Golang]
+    Kafka[Apache Kafka]
+    LC[Ledger Core<br/>Spring Boot]
+    DB[(PostgreSQL)]
 
     User -->|POST /transfer| PG
     PG -->|Produces Event| Kafka
