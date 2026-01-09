@@ -1,9 +1,11 @@
 package com.ledgerflow.core.service;
 
 import com.ledgerflow.core.model.Account;
+import com.ledgerflow.core.model.JournalEntry;
 import com.ledgerflow.core.model.Transaction;
 import com.ledgerflow.core.model.TransferResult;
 import com.ledgerflow.core.repository.AccountRepository;
+import com.ledgerflow.core.repository.JournalEntryRepository;
 import com.ledgerflow.core.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +23,8 @@ public class LedgerService {
 
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
+    private final JournalEntryRepository journalEntryRepository;
+    
     private final KafkaTemplate<String, Object> kafkaTemplate; // Inject Kafka Producer
 
     @Transactional
@@ -54,16 +58,41 @@ public class LedgerService {
             return;
         }
 
-        // 4. EXECUTE TRANSFER
+        // 4. EXECUTE TRANSFER (Double-Entry Logic)
+        
+        // A. Update Balances (The Read Cache)
         source.setBalance(source.getBalance().subtract(tx.getAmount()));
         target.setBalance(target.getBalance().add(tx.getAmount()));
 
+        // B. Create Journal Entries (The Source of Truth)
+        // Entry 1: Debit the Sender (Negative Amount)
+        JournalEntry debitEntry = new JournalEntry(
+                tx.getReferenceId(),
+                source.getAccountNumber(),
+                "DEBIT",
+                tx.getAmount().negate() // -100
+        );
+
+        // Entry 2: Credit the Receiver (Positive Amount)
+        JournalEntry creditEntry = new JournalEntry(
+                tx.getReferenceId(),
+                target.getAccountNumber(),
+                "CREDIT",
+                tx.getAmount() // +100
+        );
+
+        // Update Transaction Status
         tx.setStatus("COMPLETED");
         tx.setTimestamp(LocalDateTime.now());
 
+        // 5. Save Everything
         accountRepository.save(source);
         accountRepository.save(target);
         transactionRepository.save(tx);
+        
+        // Save the Double Entries
+        journalEntryRepository.save(debitEntry);
+        journalEntryRepository.save(creditEntry);
 
         log.info("✅ Transaction Successful: {}", tx.getReferenceId());
 
